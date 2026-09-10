@@ -508,6 +508,15 @@ private fun OverviewScreen(
     }
   }
 
+  var showingVoiceTalkModal by rememberSaveable { mutableStateOf(false) }
+
+  if (showingVoiceTalkModal) {
+    VoiceTalkCompactModal(
+      viewModel = viewModel,
+      onDismiss = { showingVoiceTalkModal = false },
+    )
+  }
+
   ClawScaffold(
     contentPadding = PaddingValues(start = 16.dp, top = 10.dp, end = 16.dp, bottom = 4.dp),
     contentWindowInsets = shellContentInsets,
@@ -560,6 +569,13 @@ private fun OverviewScreen(
                 onOpenSettingsRoute(route)
               }
             },
+          )
+        }
+
+        item {
+          VoiceTalkDashboardWidget(
+            viewModel = viewModel,
+            onClick = { showingVoiceTalkModal = true },
           )
         }
 

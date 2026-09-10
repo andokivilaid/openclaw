@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.DesktopWindows
 import androidx.compose.material3.Icon
@@ -55,6 +56,15 @@ internal fun SessionDashboardScreen(
       )
     }
   var showingDesktop by rememberSaveable(sessionKey) { mutableStateOf(false) }
+  var showingVoiceTalkModal by rememberSaveable { mutableStateOf(false) }
+
+  if (showingVoiceTalkModal) {
+    VoiceTalkCompactModal(
+      viewModel = viewModel,
+      onDismiss = { showingVoiceTalkModal = false },
+    )
+  }
+
   if (showingDesktop) {
     // The viewer replaces this screen in place rather than pushing a shell tab, so it must
     // claim System Back itself; the shell handler would otherwise pop the whole dashboard.
@@ -84,6 +94,11 @@ internal fun SessionDashboardScreen(
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
+        ClawPlainIconButton(
+          icon = Icons.Default.GraphicEq,
+          contentDescription = nativeString("Voice Talk"),
+          onClick = { showingVoiceTalkModal = true },
+        )
         if (desktopObserveAvailable && dashboardUrl != null) {
           ClawPlainIconButton(
             icon = Icons.Outlined.DesktopWindows,
@@ -97,6 +112,12 @@ internal fun SessionDashboardScreen(
           tint = ClawTheme.colors.textMuted,
         )
       }
+
+      // Voice Talk Dashboard Widget card
+      VoiceTalkDashboardWidget(
+        viewModel = viewModel,
+        onClick = { showingVoiceTalkModal = true },
+      )
       Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
         val page = controlPage
         if (isConnected && page != null && dashboardUrl != null) {
