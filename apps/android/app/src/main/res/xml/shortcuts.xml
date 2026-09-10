@@ -1,5 +1,16 @@
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
+    <shortcut
+        android:shortcutId="voice_talk"
+        android:enabled="true"
+        android:icon="@drawable/ic_widget_mic"
+        android:shortcutShortLabel="@string/voice_talk_widget_label"
+        android:shortcutLongLabel="@string/voice_talk_widget_label">
+        <intent
+            android:action="ai.openclaw.app.action.START_VOICE_TALK"
+            android:targetPackage="@string/application_id"
+            android:targetClass="ai.openclaw.app.MainActivity" />
+    </shortcut>
     <capability
         android:name="custom.actions.intent.ASK_OPENCLAW"
         app:queryPatterns="@array/ask_openclaw_query_patterns">
