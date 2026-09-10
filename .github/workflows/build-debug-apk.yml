@@ -50,7 +50,10 @@ jobs:
       - name: Locate APK
         id: locate
         run: |
-          APK_PATH=$(find apps/android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          APK_PATH=$(find apps/android/app/build/outputs/apk -name "*thirdParty*debug*.apk" | head -n 1)
+          if [[ -z "$APK_PATH" ]]; then
+            APK_PATH=$(find apps/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          fi
           echo "Found APK at: $APK_PATH"
           cp "$APK_PATH" openclaw-voice-widget-debug.apk
           echo "apk_path=openclaw-voice-widget-debug.apk" >> "$GITHUB_OUTPUT"
