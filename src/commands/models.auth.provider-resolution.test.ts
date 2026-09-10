@@ -218,82 +218,87 @@ describe("resolveRequestedLoginProviderOrThrow", () => {
 });
 
 describe("models auth login explicit credential selection", () => {
-  it.each(["force", "profile-id", "set-default", "unavailable-import", "credential-only"])(
-    "uses fresh authentication for %s with the gateway stopped",
-    async (selection) => {
-      const state = await createOpenClawTestState({
-        label: "auth-force-login",
-        env: {
-          OPENCLAW_DISABLE_BUNDLED_PLUGINS: "1",
-          OPENCLAW_BUNDLED_PLUGINS_DIR: undefined,
-          OPENCLAW_OAUTH_DIR: undefined,
-          OPENCLAW_GATEWAY_URL: undefined,
-          OPENCLAW_GATEWAY_PORT: undefined,
-          OPENCLAW_GATEWAY_TOKEN: undefined,
-          OPENCLAW_GATEWAY_PASSWORD: undefined,
-        },
-      });
-      const importOwner = vi.spyOn(migrationRuntime, "withPluginMigrationProviders");
-      if (selection === "unavailable-import") {
-        importOwner.mockImplementation(async (_params, run) =>
-          run([
-            {
-              id: "authstore-proof",
-              label: "Auth store proof",
-              plan() {
-                const items: MigrationItem[] = [
-                  {
-                    id: "auth:shared",
-                    kind: "auth",
-                    action: "skip",
-                    status: "skipped",
-                    message: "The existing sign-in needs to be renewed.",
-                    details: { credentialImportUnavailable: true },
-                  },
-                ];
-                return {
-                  providerId: "authstore-proof",
-                  source: "/fixture",
-                  items,
-                  summary: summarizeMigrationItems(items),
-                };
-              },
-              apply() {
-                throw new Error("Unavailable credentials cannot be applied");
-              },
+  it.each([
+    "force",
+    "profile-id",
+    "set-default",
+    "unavailable-import",
+    "credential-only",
+    "revoked-after-save",
+  ])("uses fresh authentication for %s with the gateway stopped", async (selection) => {
+    const state = await createOpenClawTestState({
+      label: "auth-force-login",
+      env: {
+        OPENCLAW_DISABLE_BUNDLED_PLUGINS: "1",
+        OPENCLAW_BUNDLED_PLUGINS_DIR: undefined,
+        OPENCLAW_OAUTH_DIR: undefined,
+        OPENCLAW_GATEWAY_URL: undefined,
+        OPENCLAW_GATEWAY_PORT: undefined,
+        OPENCLAW_GATEWAY_TOKEN: undefined,
+        OPENCLAW_GATEWAY_PASSWORD: undefined,
+      },
+    });
+    const importOwner = vi.spyOn(migrationRuntime, "withPluginMigrationProviders");
+    if (selection === "unavailable-import") {
+      importOwner.mockImplementation(async (_params, run) =>
+        run([
+          {
+            id: "authstore-proof",
+            label: "Auth store proof",
+            plan() {
+              const items: MigrationItem[] = [
+                {
+                  id: "auth:shared",
+                  kind: "auth",
+                  action: "skip",
+                  status: "skipped",
+                  message: "The existing sign-in needs to be renewed.",
+                  details: { credentialImportUnavailable: true },
+                },
+              ];
+              return {
+                providerId: "authstore-proof",
+                source: "/fixture",
+                items,
+                summary: summarizeMigrationItems(items),
+              };
             },
-          ]),
-        );
-      } else {
-        importOwner.mockRejectedValue(
-          new Error("Explicit credential selection must not acquire an import owner"),
-        );
-      }
-      try {
-        pluginLoaderCacheState.clear();
-        resetPluginRuntimeStateForTest();
-        const provider = "authstore-proof";
-        const freshId = `${provider}:${selection === "profile-id" ? "selected" : "fresh"}`;
-        const fresh = { type: "token" as const, provider, token: "fixture-fresh-token" };
-        const expired = { ...fresh, token: "fixture-expired-token", expires: 1 };
-        const unrelated = {
-          type: "token" as const,
-          provider: "other-proof",
-          token: "fixture-other",
-        };
-        const pluginDir = path.join(state.workspaceDir, ".openclaw", "extensions", provider);
-        await fs.mkdir(pluginDir, { recursive: true, mode: 0o755 });
-        await fs.writeFile(
-          path.join(pluginDir, "openclaw.plugin.json"),
-          JSON.stringify({
-            id: provider,
-            providers: [provider],
-            configSchema: { type: "object", additionalProperties: false, properties: {} },
-          }),
-        );
-        await fs.writeFile(
-          path.join(pluginDir, "index.cjs"),
-          `module.exports = {
+            apply() {
+              throw new Error("Unavailable credentials cannot be applied");
+            },
+          },
+        ]),
+      );
+    } else {
+      importOwner.mockRejectedValue(
+        new Error("Explicit credential selection must not acquire an import owner"),
+      );
+    }
+    try {
+      pluginLoaderCacheState.clear();
+      resetPluginRuntimeStateForTest();
+      const provider = "authstore-proof";
+      const freshId = `${provider}:${selection === "profile-id" ? "selected" : "fresh"}`;
+      const fresh = { type: "token" as const, provider, token: "fixture-fresh-token" };
+      const expired = { ...fresh, token: "fixture-expired-token", expires: 1 };
+      const unrelated = {
+        type: "token" as const,
+        provider: "other-proof",
+        token: "fixture-other",
+      };
+      const pluginDir = path.join(state.workspaceDir, ".openclaw", "extensions", provider);
+      await fs.mkdir(pluginDir, { recursive: true, mode: 0o755 });
+      await fs.writeFile(
+        path.join(pluginDir, "openclaw.plugin.json"),
+        JSON.stringify({
+          id: provider,
+          providers: [provider],
+          configSchema: { type: "object", additionalProperties: false, properties: {} },
+        }),
+      );
+      await fs.writeFile(
+        path.join(pluginDir, "index.cjs"),
+        `module.exports = {
           id: ${JSON.stringify(provider)},
           register(api) {
             api.registerProvider({
@@ -310,99 +315,118 @@ describe("models auth login explicit credential selection", () => {
             });
           }
         };`,
-        );
-        const config: OpenClawConfig = {
-          agents: {
-            defaults: { model: { primary: "other-proof/existing" } },
-            list: [{ id: "main", workspace: state.workspaceDir }],
-          },
-          plugins: { allow: [provider], entries: { [provider]: { enabled: true } } },
-          gateway: {
-            mode: "local",
-            port: await getFreePort(),
-            auth: { mode: "token", token: "fixture-gateway-token" },
-          },
-        };
-        await state.writeConfig(config);
-        saveAuthProfileStore(
-          {
-            version: 1,
-            profiles: { [`${provider}:shared`]: expired, "other-proof:shared": unrelated },
-          },
-          undefined,
-          { sharedStoreWrite: true, filterExternalAuthProfiles: false, syncExternalCli: false },
-        );
-        await state.writeAuthProfiles({
+      );
+      const config: OpenClawConfig = {
+        agents: {
+          defaults: { model: { primary: "other-proof/existing" } },
+          list: [{ id: "main", workspace: state.workspaceDir }],
+        },
+        plugins: { allow: [provider], entries: { [provider]: { enabled: true } } },
+        gateway: {
+          mode: "local",
+          port: await getFreePort(),
+          auth: { mode: "token", token: "fixture-gateway-token" },
+        },
+      };
+      await state.writeConfig(config);
+      saveAuthProfileStore(
+        {
           version: 1,
-          profiles: { [`${provider}:local`]: expired, "other-proof:local": unrelated },
-          order: { [provider]: [`${provider}:local`] },
-        });
-        const unexpectedPrompt = async (): Promise<never> => {
-          throw new Error("Unexpected interactive prompt in explicit fixture login");
-        };
-        const runtime = { log: vi.fn(), error: vi.fn(), exit: vi.fn() };
-        await runModelsAuthLoginFlowCore({
-          provider,
-          method: "token",
-          agent: "main",
-          ...(selection === "force"
-            ? { force: true }
-            : selection === "profile-id"
-              ? { profileId: freshId }
-              : selection === "set-default"
-                ? { setDefault: true }
-                : selection === "credential-only"
-                  ? { credentialOnly: true }
+          profiles: { [`${provider}:shared`]: expired, "other-proof:shared": unrelated },
+        },
+        undefined,
+        { sharedStoreWrite: true, filterExternalAuthProfiles: false, syncExternalCli: false },
+      );
+      await state.writeAuthProfiles({
+        version: 1,
+        profiles: { [`${provider}:local`]: expired, "other-proof:local": unrelated },
+        order: { [provider]: [`${provider}:local`] },
+      });
+      const unexpectedPrompt = async (): Promise<never> => {
+        throw new Error("Unexpected interactive prompt in explicit fixture login");
+      };
+      const runtime = { log: vi.fn(), error: vi.fn(), exit: vi.fn() };
+      const login = runModelsAuthLoginFlowCore({
+        provider,
+        method: "token",
+        agent: "main",
+        ...(selection === "force"
+          ? { force: true }
+          : selection === "profile-id"
+            ? { profileId: freshId }
+            : selection === "set-default"
+              ? { setDefault: true }
+              : selection === "credential-only"
+                ? { credentialOnly: true }
+                : selection === "revoked-after-save"
+                  ? {
+                      credentialOnly: true,
+                      assertCurrent: () => {
+                        if (loadPersistedAuthProfileStore()?.profiles[freshId]) {
+                          throw new Error(
+                            "Login authority was revoked after the credential write.",
+                          );
+                        }
+                      },
+                    }
                   : {}),
-          config,
-          runtime,
-          prompter: createWizardPrompter({
-            select: unexpectedPrompt,
-            text: unexpectedPrompt,
-            confirm: unexpectedPrompt,
-          }),
-        });
-
-        const savedConfig = JSON.parse(await fs.readFile(state.configPath, "utf8"));
-        expect(savedConfig.agents.defaults.model.primary).toBe(
-          selection === "set-default" ? "authstore-proof/recommended" : "other-proof/existing",
-        );
-        if (selection === "credential-only") {
-          expect(savedConfig.agents.defaults.models).toBeUndefined();
-        }
-        expect(loadPersistedAuthProfileStore()?.profiles).toEqual({
-          ...(selection !== "force" ? { [`${provider}:shared`]: expired } : {}),
-          [freshId]: fresh,
-          "other-proof:shared": unrelated,
-        });
-        const local = loadPersistedAuthProfileStore(state.agentDir());
-        expect(local?.profiles).toEqual({
-          ...(selection !== "force" ? { [`${provider}:local`]: expired } : {}),
-          "other-proof:local": unrelated,
-        });
-        expect(loadAuthProfileStoreWithoutExternalProfiles(state.agentDir()).profiles).toEqual({
-          ...(selection !== "force"
-            ? { [`${provider}:shared`]: expired, [`${provider}:local`]: expired }
-            : {}),
-          [freshId]: fresh,
-          "other-proof:shared": unrelated,
-          "other-proof:local": unrelated,
-        });
-        if (selection === "force") {
-          expect(local?.order?.[provider]).toBeUndefined();
-          expect(runtime.log).toHaveBeenCalledWith(
-            `Removed cached auth profiles for provider "${provider}" (--force). Running fresh auth flow.`,
-          );
-        }
-        expect(runtime.log).toHaveBeenCalledWith(`Auth profile: ${freshId} (${provider}/token)`);
-      } finally {
-        importOwner.mockRestore();
-        pluginLoaderCacheState.clear();
-        resetPluginRuntimeStateForTest();
-        clearRuntimeAuthProfileStoreSnapshots();
-        clearAuthProfileMigrationDiagnostics();
-        await state.cleanup();
+        config,
+        runtime,
+        prompter: createWizardPrompter({
+          select: unexpectedPrompt,
+          text: unexpectedPrompt,
+          confirm: unexpectedPrompt,
+        }),
+      });
+      if (selection === "revoked-after-save") {
+        await expect(login).rejects.toThrow("credentials were saved");
+      } else {
+        await login;
       }
-    },
-  );
+
+      const savedConfig = JSON.parse(await fs.readFile(state.configPath, "utf8"));
+      expect(savedConfig.agents.defaults.model.primary).toBe(
+        selection === "set-default" ? "authstore-proof/recommended" : "other-proof/existing",
+      );
+      if (selection === "credential-only") {
+        expect(savedConfig.agents.defaults.models).toBeUndefined();
+      }
+      expect(loadPersistedAuthProfileStore()?.profiles).toEqual({
+        ...(selection !== "force" ? { [`${provider}:shared`]: expired } : {}),
+        [freshId]: fresh,
+        "other-proof:shared": unrelated,
+      });
+      const local = loadPersistedAuthProfileStore(state.agentDir());
+      expect(local?.profiles).toEqual({
+        ...(selection !== "force" ? { [`${provider}:local`]: expired } : {}),
+        "other-proof:local": unrelated,
+      });
+      expect(loadAuthProfileStoreWithoutExternalProfiles(state.agentDir()).profiles).toEqual({
+        ...(selection !== "force"
+          ? { [`${provider}:shared`]: expired, [`${provider}:local`]: expired }
+          : {}),
+        [freshId]: fresh,
+        "other-proof:shared": unrelated,
+        "other-proof:local": unrelated,
+      });
+      if (selection === "force") {
+        expect(local?.order?.[provider]).toBeUndefined();
+        expect(runtime.log).toHaveBeenCalledWith(
+          `Removed cached auth profiles for provider "${provider}" (--force). Running fresh auth flow.`,
+        );
+      }
+      if (selection === "revoked-after-save") {
+        expect(local?.order?.[provider]).toEqual([`${provider}:local`]);
+      } else {
+        expect(runtime.log).toHaveBeenCalledWith(`Auth profile: ${freshId} (${provider}/token)`);
+      }
+    } finally {
+      importOwner.mockRestore();
+      pluginLoaderCacheState.clear();
+      resetPluginRuntimeStateForTest();
+      clearRuntimeAuthProfileStoreSnapshots();
+      clearAuthProfileMigrationDiagnostics();
+      await state.cleanup();
+    }
+  });
 });

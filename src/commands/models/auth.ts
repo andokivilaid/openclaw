@@ -40,6 +40,7 @@ import {
   restorePriorAgentsDefaultsModelUnlessOptIn,
   resolveProviderMatch,
 } from "../../plugins/provider-auth-choice-helpers.js";
+import { ProviderCredentialsSavedError } from "../../plugins/provider-auth-errors.js";
 import { applyAuthProfileConfig } from "../../plugins/provider-auth-helpers.js";
 import { persistProviderAuthProfilesAfterLogin } from "../../plugins/provider-auth-persistence.js";
 import { createVpsAwareOAuthHandlers } from "../../plugins/provider-oauth-flow.js";
@@ -433,87 +434,94 @@ async function persistProviderAuthResult(params: {
     params.result.configPatch || (params.setDefault && defaultModel),
   );
 
-  for (const candidate of profiles) {
-    const persisted = await persistProviderAuthProfilesAfterLogin({
-      profiles: [candidate],
-      beforeWrite: params.assertCurrent,
-      config: params.config,
-      env: params.env,
-      agentDir: params.agentDir,
-      ...(params.env?.OPENCLAW_STATE_DIR ? { stateDir: params.env.OPENCLAW_STATE_DIR } : {}),
-    });
-    const profile = expectDefined(persisted[0], "persisted auth profile");
-    persistedProfiles.push(profile);
-    params.assertCurrent?.();
-    await promotePersistedAuthProfile({
-      config: params.config,
-      agentDir: params.agentDir,
-      provider: profile.credential.provider,
-      profileId: profile.profileId,
-    });
-  }
-
-  // Auth login owns the credential store. Keep openclaw.json untouched unless
-  // the provider explicitly returns a config patch or the user opts into a
-  // default-model write.
-  if (shouldUpdateConfig) {
-    const updated = await updateConfig(
-      (cfg) => {
-        params.assertCurrent?.();
-        const priorAgentsDefaultsModel = cfg.agents?.defaults?.model;
-        let next = cfg;
-        if (params.result.configPatch) {
-          next = applyProviderAuthConfigPatch(next, params.result.configPatch, {
-            replaceDefaultModels: params.result.replaceDefaultModels,
-          });
-        }
-        next = restorePriorAgentsDefaultsModelUnlessOptIn({
-          cfg: next,
-          priorAgentsDefaultsModel,
-          setDefault: params.setDefault,
-        });
-        if (params.setDefault && defaultModel) {
-          next = applyDefaultModel(next, defaultModel);
-        }
-        return next;
-      },
-      undefined,
-      params.assertCurrent,
-    );
-    if (defaultModel) {
-      const repaired = await repairCodexRuntimePluginInstallForModelSelection({
-        cfg: updated,
-        model: defaultModel,
+  try {
+    for (const candidate of profiles) {
+      const persisted = await persistProviderAuthProfilesAfterLogin({
+        profiles: [candidate],
+        beforeWrite: params.assertCurrent,
+        config: params.config,
+        env: params.env,
+        agentDir: params.agentDir,
+        ...(params.env?.OPENCLAW_STATE_DIR ? { stateDir: params.env.OPENCLAW_STATE_DIR } : {}),
       });
-      const copilotRepaired = await repairCopilotRuntimePluginInstallForModelSelection({
-        cfg: updated,
-        model: defaultModel,
+      const profile = expectDefined(persisted[0], "persisted auth profile");
+      persistedProfiles.push(profile);
+      params.assertCurrent?.();
+      await promotePersistedAuthProfile({
+        config: params.config,
+        agentDir: params.agentDir,
+        provider: profile.credential.provider,
+        profileId: profile.profileId,
       });
-      for (const warning of [...repaired.warnings, ...copilotRepaired.warnings]) {
-        params.runtime.error?.(warning);
-      }
     }
-    logConfigUpdated(params.runtime);
-  }
 
-  await refreshRunningGatewayAuthState(params.agentId, params.runtime);
+    // Auth login owns the credential store. Keep openclaw.json untouched unless
+    // the provider explicitly returns a config patch or the user opts into a
+    // default-model write.
+    if (shouldUpdateConfig) {
+      const updated = await updateConfig(
+        (cfg) => {
+          params.assertCurrent?.();
+          const priorAgentsDefaultsModel = cfg.agents?.defaults?.model;
+          let next = cfg;
+          if (params.result.configPatch) {
+            next = applyProviderAuthConfigPatch(next, params.result.configPatch, {
+              replaceDefaultModels: params.result.replaceDefaultModels,
+            });
+          }
+          next = restorePriorAgentsDefaultsModelUnlessOptIn({
+            cfg: next,
+            priorAgentsDefaultsModel,
+            setDefault: params.setDefault,
+          });
+          if (params.setDefault && defaultModel) {
+            next = applyDefaultModel(next, defaultModel);
+          }
+          return next;
+        },
+        undefined,
+        params.assertCurrent,
+      );
+      if (defaultModel) {
+        const repaired = await repairCodexRuntimePluginInstallForModelSelection({
+          cfg: updated,
+          model: defaultModel,
+        });
+        const copilotRepaired = await repairCopilotRuntimePluginInstallForModelSelection({
+          cfg: updated,
+          model: defaultModel,
+        });
+        for (const warning of [...repaired.warnings, ...copilotRepaired.warnings]) {
+          params.runtime.error?.(warning);
+        }
+      }
+      logConfigUpdated(params.runtime);
+    }
 
-  for (const profile of persistedProfiles) {
-    params.runtime.log(
-      `Auth profile: ${profile.profileId} (${profile.credential.provider}/${credentialMode(profile.credential)})`,
-    );
+    await refreshRunningGatewayAuthState(params.agentId, params.runtime);
+
+    for (const profile of persistedProfiles) {
+      params.runtime.log(
+        `Auth profile: ${profile.profileId} (${profile.credential.provider}/${credentialMode(profile.credential)})`,
+      );
+    }
+    if (defaultModel) {
+      params.runtime.log(
+        params.setDefault
+          ? `Default model set to ${defaultModel}`
+          : `Default model available: ${defaultModel} (current default unchanged; run ${formatCliCommand(`openclaw models set ${defaultModel}`)} to apply)`,
+      );
+    }
+    if (params.result.notes && params.result.notes.length > 0) {
+      await params.prompter.note(params.result.notes.join("\n"), "Provider notes");
+    }
+    return persistedProfiles;
+  } catch (error) {
+    if (persistedProfiles.length > 0) {
+      throw new ProviderCredentialsSavedError(error);
+    }
+    throw error;
   }
-  if (defaultModel) {
-    params.runtime.log(
-      params.setDefault
-        ? `Default model set to ${defaultModel}`
-        : `Default model available: ${defaultModel} (current default unchanged; run ${formatCliCommand(`openclaw models set ${defaultModel}`)} to apply)`,
-    );
-  }
-  if (params.result.notes && params.result.notes.length > 0) {
-    await params.prompter.note(params.result.notes.join("\n"), "Provider notes");
-  }
-  return persistedProfiles;
 }
 
 function resolveConfiguredAuthSelectionForProvider(
