@@ -9,7 +9,7 @@
         <intent
             android:action="ai.openclaw.app.action.START_VOICE_TALK"
             android:targetPackage="@string/application_id"
-            android:targetClass="ai.openclaw.app.MainActivity" />
+            android:targetClass="ai.openclaw.app.VoiceTalkOverlayActivity" />
     </shortcut>
     <capability
         android:name="custom.actions.intent.ASK_OPENCLAW"

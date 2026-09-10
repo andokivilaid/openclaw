@@ -3381,7 +3381,9 @@ class NodeRuntime private constructor(
       }
     } else {
       stopMessageSpeech()
-      stopActiveVoiceSession()
+      if (_voiceCaptureMode.value != VoiceCaptureMode.TalkMode) {
+        stopActiveVoiceSession()
+      }
       publishNodePresenceAliveBeacon(NodePresenceAliveBeacon.Trigger.Background, throttleRecentSuccess = true)
     }
   }

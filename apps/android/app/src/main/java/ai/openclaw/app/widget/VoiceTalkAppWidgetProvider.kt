@@ -1,7 +1,7 @@
 package ai.openclaw.app.widget
 
-import ai.openclaw.app.MainActivity
 import ai.openclaw.app.R
+import ai.openclaw.app.VoiceTalkOverlayActivity
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -11,7 +11,7 @@ import android.widget.RemoteViews
 
 /**
  * Android AppWidgetProvider for the Voice Talk Home Screen Widget.
- * Launches MainActivity with action START_VOICE_TALK to immediately activate Voice Talk mode.
+ * Launches VoiceTalkOverlayActivity to immediately activate Voice Talk mode in a floating translucent overlay.
  */
 class VoiceTalkAppWidgetProvider : AppWidgetProvider() {
   override fun onUpdate(
@@ -33,9 +33,9 @@ class VoiceTalkAppWidgetProvider : AppWidgetProvider() {
       appWidgetId: Int,
     ) {
       val intent =
-        Intent(context, MainActivity::class.java).apply {
+        Intent(context, VoiceTalkOverlayActivity::class.java).apply {
           action = ACTION_START_VOICE_TALK
-          flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+          flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
       val pendingIntent =
