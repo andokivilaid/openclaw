@@ -3,7 +3,6 @@ package ai.openclaw.app.ui
 import ai.openclaw.app.MainViewModel
 import ai.openclaw.app.i18n.nativeString
 import ai.openclaw.app.ui.chat.rememberChatRealtimeTalkLauncher
-import ai.openclaw.app.ui.design.ClawCard
 import ai.openclaw.app.ui.design.ClawPlainIconButton
 import ai.openclaw.app.ui.design.ClawPrimaryButton
 import ai.openclaw.app.ui.design.ClawSecondaryButton
@@ -12,6 +11,7 @@ import ai.openclaw.app.ui.design.ClawStatusPill
 import ai.openclaw.app.ui.design.ClawTheme
 import ai.openclaw.app.ui.design.TalkWaveform
 import ai.openclaw.app.ui.design.TalkWaveformPhase
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -88,7 +87,7 @@ internal fun VoiceTalkDashboardWidget(
     awaitingAgent = awaitingAgent,
   )
 
-  ClawCard(
+  Surface(
     onClick = onClick,
     modifier = modifier
       .fillMaxWidth()
@@ -99,6 +98,10 @@ internal fun VoiceTalkDashboardWidget(
           nativeString("Voice Talk, click to open controls")
         }
       },
+    shape = RoundedCornerShape(ClawTheme.radii.panel),
+    color = ClawTheme.colors.surface,
+    contentColor = ClawTheme.colors.text,
+    border = BorderStroke(1.dp, ClawTheme.colors.border),
   ) {
     Column(
       modifier = Modifier
@@ -201,7 +204,6 @@ internal fun VoiceTalkCompactModal(
   val speaking by viewModel.talkModeSpeaking.collectAsState()
   val awaitingAgent by viewModel.talkAwaitingAgent.collectAsState()
   val speakerEnabled by viewModel.speakerEnabled.collectAsState()
-  val micEnabled by viewModel.micEnabled.collectAsState()
   val startTalkLauncher = rememberChatRealtimeTalkLauncher(viewModel)
 
   val phase = resolveVoiceTalkWaveformPhase(
@@ -311,36 +313,40 @@ internal fun VoiceTalkCompactModal(
           )
         }
 
-        // Controls: Mute, Speaker, End/Start
+        // Controls: Talk Toggle, Speaker Toggle
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.SpaceEvenly,
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          // Mic Mute / Unmute Button
+          // Mic / Talk Mode Toggle Button
           Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
           ) {
             Surface(
               onClick = {
-                viewModel.setMicEnabled(!micEnabled)
+                if (talkActive) {
+                  viewModel.setTalkModeEnabled(false)
+                } else {
+                  startTalkLauncher()
+                }
               },
               modifier = Modifier.size(ClawTheme.spacing.touchTarget),
               shape = CircleShape,
-              color = if (!micEnabled) ClawTheme.colors.dangerSoft else ClawTheme.colors.surfacePressed,
-              contentColor = if (!micEnabled) ClawTheme.colors.danger else ClawTheme.colors.text,
+              color = if (!talkActive) ClawTheme.colors.dangerSoft else ClawTheme.colors.surfacePressed,
+              contentColor = if (!talkActive) ClawTheme.colors.danger else ClawTheme.colors.text,
             ) {
               Box(contentAlignment = Alignment.Center) {
                 Icon(
-                  imageVector = if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff,
-                  contentDescription = if (micEnabled) nativeString("Mute microphone") else nativeString("Unmute microphone"),
+                  imageVector = if (talkActive) Icons.Default.Mic else Icons.Default.MicOff,
+                  contentDescription = if (talkActive) nativeString("Turn off Talk Mode") else nativeString("Turn on Talk Mode"),
                   modifier = Modifier.size(20.dp),
                 )
               }
             }
             Text(
-              text = if (micEnabled) nativeString("Mute") else nativeString("Unmuted"),
+              text = if (talkActive) nativeString("Mic Active") else nativeString("Mic Off"),
               style = ClawTheme.type.caption.copy(fontSize = 11.sp),
               color = ClawTheme.colors.textMuted,
             )

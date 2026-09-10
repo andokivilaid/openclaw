@@ -1209,6 +1209,10 @@ class MainViewModel private constructor(
     ensureRuntime().setSpeakerEnabled(enabled)
   }
 
+  fun setMicEnabled(enabled: Boolean) {
+    ensureRuntime().setMicEnabled(enabled)
+  }
+
   fun setPreferredAudioInputDevice(key: String?) {
     ensureRuntime().setPreferredAudioInputDevice(key)
   }
