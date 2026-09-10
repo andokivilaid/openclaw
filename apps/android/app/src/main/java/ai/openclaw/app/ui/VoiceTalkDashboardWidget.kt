@@ -25,12 +25,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -368,7 +368,7 @@ internal fun VoiceTalkCompactModal(
             ) {
               Box(contentAlignment = Alignment.Center) {
                 Icon(
-                  imageVector = if (speakerEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                  imageVector = if (speakerEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
                   contentDescription = if (speakerEnabled) nativeString("Mute speaker") else nativeString("Enable speaker"),
                   modifier = Modifier.size(20.dp),
                 )
