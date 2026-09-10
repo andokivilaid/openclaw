@@ -120,6 +120,15 @@ android {
 
   // Release signing is local-only; keep the keystore path and passwords out of the repo.
   signingConfigs {
+    getByName("debug") {
+      val debugStore = project.file("debug.keystore")
+      if (debugStore.isFile) {
+        storeFile = debugStore
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
+    }
     if (hasAndroidReleaseSigning) {
       create("release") {
         storeFile = project.file(checkNotNull(resolvedAndroidStoreFile))
@@ -185,6 +194,7 @@ android {
       versionNameSuffix = "-debug"
       resValue("string", "application_id", "$openClawAndroidApplicationId.debug")
       isMinifyEnabled = false
+      signingConfig = signingConfigs.getByName("debug")
     }
   }
 
