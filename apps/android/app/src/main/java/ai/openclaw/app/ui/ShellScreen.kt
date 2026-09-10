@@ -509,6 +509,14 @@ private fun OverviewScreen(
   }
 
   var showingVoiceTalkModal by rememberSaveable { mutableStateOf(false) }
+  val requestedVoiceTalkModal by viewModel.requestedVoiceTalkModal.collectAsState()
+
+  LaunchedEffect(requestedVoiceTalkModal) {
+    if (requestedVoiceTalkModal) {
+      showingVoiceTalkModal = true
+      viewModel.clearRequestedVoiceTalkModal()
+    }
+  }
 
   if (showingVoiceTalkModal) {
     VoiceTalkCompactModal(

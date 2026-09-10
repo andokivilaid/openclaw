@@ -331,6 +331,8 @@ class MainViewModel private constructor(
 
   private val _requestedHomeDestination = MutableStateFlow<HomeDestination?>(null)
   val requestedHomeDestination: StateFlow<HomeDestination?> = _requestedHomeDestination
+  private val _requestedVoiceTalkModal = MutableStateFlow(false)
+  val requestedVoiceTalkModal: StateFlow<Boolean> = _requestedVoiceTalkModal
   private val requestedSettingsRouteState = MutableStateFlow<SettingsRoute?>(null)
   internal val requestedSettingsRoute: StateFlow<SettingsRoute?> get() = requestedSettingsRouteState
   private val _startOnboardingAtGatewaySetup = MutableStateFlow(false)
@@ -1015,6 +1017,14 @@ class MainViewModel private constructor(
 
   fun requestHomeDestination(destination: HomeDestination) {
     _requestedHomeDestination.value = destination
+  }
+
+  fun requestShowingVoiceTalkModal() {
+    _requestedVoiceTalkModal.value = true
+  }
+
+  fun clearRequestedVoiceTalkModal() {
+    _requestedVoiceTalkModal.value = false
   }
 
   internal fun openConversationNotification(target: ConversationNotificationTarget) {

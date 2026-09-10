@@ -240,6 +240,10 @@ class MainActivity : AppCompatActivity() {
       viewModel.openConversationNotification(target)
       return
     }
+    if (intent?.action == "ai.openclaw.app.action.START_VOICE_TALK") {
+      viewModel.requestShowingVoiceTalkModal()
+      return
+    }
     parseHomeDestinationIntent(intent)?.let { destination ->
       viewModel.requestHomeDestination(destination)
       return
